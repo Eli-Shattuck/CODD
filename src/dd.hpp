@@ -5,6 +5,7 @@
 #include <iomanip>
 #include <type_traits>
 #include "node.hpp"
+#include "heap.hpp"
 #include <vector>
 #include <list>
 #include <optional>
@@ -19,6 +20,7 @@ class Strategy;
 class AbstractDD;
 
 typedef std::function<void(const std::vector<int>&)> SolutionCB;
+typedef std::function<bool(const ANode::Ptr&, const ANode::Ptr&)> H_ORDER; // bool (*H_ORDER)(const ANode::Ptr&, const ANode::Ptr&);
 
 class Bounds {
    double _primal,_g,_dual;
@@ -121,7 +123,7 @@ public:
    std::vector<int> incumbent();
    void compute(Bounds& bnds);
    std::vector<ANode::Ptr> computeCutSet();
-   std::vector<ANode::Ptr> theDiscardedSet();
+   Heap<ANode::Ptr,H_ORDER> theDiscardedSet();
    void print(std::ostream& os,std::string gLabel);
    void setStrategy(Strategy* s);
    void display();
@@ -140,7 +142,7 @@ public:
    virtual const std::string getName() const = 0;
    virtual void compute(Bounds&) {}
    virtual std::vector<ANode::Ptr> computeCutSet() { return std::vector<ANode::Ptr> {};}
-   virtual std::vector<ANode::Ptr> theDiscardedSet() { return std::vector<ANode::Ptr> {}; }
+   virtual Heap<ANode::Ptr,H_ORDER> theDiscardedSet() { return Heap<ANode::Ptr,H_ORDER>(_dd->_mem,64000,nullptr); }
    virtual bool primal() const { return false;}
    virtual bool dual() const { return false;}
 };
@@ -290,14 +292,15 @@ public:
 class Restricted: public WidthBounded {
    void truncate(NDArray& layer);
 protected:
-   std::vector<ANode::Ptr> _discardedSet;
+   static bool hOrder(const ANode::Ptr& a, const ANode::Ptr& b);
+   Heap<ANode::Ptr,H_ORDER> _discardedSet;
 public:
-   Restricted(const unsigned mxw) : WidthBounded(mxw), _discardedSet(std::vector<ANode::Ptr> {}) { }
+   Restricted(const unsigned mxw) : WidthBounded(mxw), _discardedSet(Heap<ANode::Ptr,H_ORDER>(_dd->_mem,64000,hOrder)) { }
    const std::string getName() const { return "Restricted";}
    void compute(Bounds& );
    bool primal() const { return true;}
    ANode::Ptr checkDominance(CQueue<ANode::Ptr>& qn,ANode::Ptr n,double nObj);
-   std::vector<ANode::Ptr> theDiscardedSet() { return _discardedSet; }
+   Heap<ANode::Ptr,H_ORDER> theDiscardedSet() { return _discardedSet; }
 };
 
 

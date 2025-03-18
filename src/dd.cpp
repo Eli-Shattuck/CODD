@@ -1,6 +1,7 @@
 #include "dd.hpp"
 #include "node.hpp"
 #include "util.hpp"
+#include "heap.hpp"
 #include <iostream>
 #include <fstream>
 #include <iomanip>
@@ -87,7 +88,7 @@ std::vector<ANode::Ptr> AbstractDD::computeCutSet()
    return _strat->computeCutSet();
 }
 
-std::vector<ANode::Ptr> AbstractDD::theDiscardedSet()
+Heap<ANode::Ptr, H_ORDER> AbstractDD::theDiscardedSet()
 {
    return _strat->theDiscardedSet();
 }
@@ -174,8 +175,8 @@ void AbstractDD::saveGraph(std::ostream& os,std::string gLabel)
          printNode(os,to);
          os << "\"";
 
-         auto ds = this->theDiscardedSet();
-         bool isDiscarded = std::find(ds.begin(),ds.end(),to)!=ds.end();
+         //auto ds = this->theDiscardedSet();
+         bool isDiscarded = false; //std::find(ds.begin(),ds.end(),to)!=ds.end();
 
          os << " [ label=\"" << k->_obj << "(" << k->_lbl << ")\"" 
             << ", color=\"" << edgeColors[isDiscarded] << "\""
@@ -420,6 +421,10 @@ ANode::Ptr Restricted::checkDominance(CQueue<ANode::Ptr>& qn,ANode::Ptr n,double
    return rv;
 }
 
+bool Restricted::hOrder(const ANode::Ptr& a, const ANode::Ptr& b)
+{
+   return a->getBound() > b->getBound();
+}
 
 void Restricted::compute(Bounds& bnds)
 {
@@ -442,7 +447,7 @@ void Restricted::compute(Bounds& bnds)
          
          if(discarding) { // pickup discarded parents
             //std::cout << "discarding parent..." << std::endl;
-            _discardedSet.push_back(p);
+            _discardedSet.insert(p);
             continue; // do not expand discarded parent
          }
 
@@ -486,7 +491,7 @@ void Restricted::compute(Bounds& bnds)
                   // std::cout << "discarding child...  ";
                   // _dd->printNode(std::cout, child);
                   // std::cout << std::endl;
-                  _discardedSet.push_back(child);
+                  _discardedSet.insert(child);
                   //goto nextParent; // do not process discarded child
                   goto nextLabel;
                }

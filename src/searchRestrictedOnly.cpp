@@ -79,7 +79,8 @@ void BAndBRestrictedOnly::search(Bounds& bnds)
             
          auto discardSet = restricted->theDiscardedSet();
          //cout << "discarded set: " << discardSet << endl;
-         for(auto n : discardSet) {
+         while(!discardSet.empty()) {
+            auto n = discardSet.extractMax();
                
             // std::cout << "discarded: ";
             // restricted->printNode(std::cout, n);

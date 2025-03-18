@@ -87,13 +87,13 @@ void BAndBRestrictedFirst::search(Bounds& bnds)
       auto discardSet = restricted->theDiscardedSet();
       //cout << "discarded set: " << discardSet << endl;
       int numDiscarded = 0;
-      for(auto it = discardSet.rbegin(); it != discardSet.rend(); it++) {
+      while(!discardSet.empty()) {
          // std::cout << "discarded("<< (numDiscarded++) << "/" << discardSet.size() << "): ";
          // restricted->printNode(std::cout, *it);
          // std::cout << std::endl;
-         auto n = *it;
+         auto n = discardSet.extractMax();
 
-         bool newGuyDominatedDD = false;
+         bool newGuyDominatedBB = false;
          bool newGuyDominatedDS = false;
          bool newGuyDominated   = false;
          if(relaxed->hasLocal()) {
@@ -111,13 +111,13 @@ void BAndBRestrictedFirst::search(Bounds& bnds)
             auto pqSz = pq.size();
             auto dsSz = discardSet.size();
             auto allLocsBB = new Heap<QNode,decltype(hOrder)>::LocType*[pqSz];
-            auto allLocsDS = std::vector<std::vector<ANode::Ptr>::reverse_iterator>(dsSz);
+            auto allLocsDS = new Heap<ANode::Ptr,H_ORDER>::LocType*[dsSz];
             for(unsigned k = 0;k < pqSz;k++) {
                auto bbn = pq[k];
                bool isObjDom   = relaxed->isBetterEQ(bbn->value().node->getBound(),n->getBound());
                //std::cout << "isObjDom: " << isObjDom << "   dom: " << relaxed->dominates(bbn->value().node,n) << std::endl;
-               newGuyDominatedDD = isObjDom && relaxed->dominates(bbn->value().node,n);
-               if (newGuyDominatedDD) {
+               newGuyDominatedBB = isObjDom && relaxed->dominates(bbn->value().node,n);
+               if (newGuyDominatedBB) {
                   goto prune;             
                }        
                bool objDom   = relaxed->isBetterEQ(n->getBound(),bbn->value().node->getBound());
@@ -125,20 +125,20 @@ void BAndBRestrictedFirst::search(Bounds& bnds)
                if (qnDominated)
                   allLocsBB[dBB++] = bbn;
             }
-            for(auto k = it+1; k != discardSet.rend(); k--) {
-               auto dsn = *k;
-               bool isObjDom   = relaxed->isBetterEQ(dsn->getBound(),n->getBound());
-               newGuyDominatedDS = isObjDom && relaxed->dominates(dsn,n);
+            for(unsigned k = 0;k < pqSz;k++) {
+               auto dsn = discardSet[k];
+               bool isObjDom   = relaxed->isBetterEQ(dsn->value()->getBound(),n->getBound());
+               newGuyDominatedDS = isObjDom && relaxed->dominates(dsn->value(),n);
                if (newGuyDominatedDS) {
                   goto prune;             
                }        
-               bool objDom   = relaxed->isBetterEQ(n->getBound(),dsn->getBound());
-               bool qnDominated = objDom && relaxed->dominates(n,dsn);
+               bool objDom   = relaxed->isBetterEQ(n->getBound(),dsn->value()->getBound());
+               bool qnDominated = objDom && relaxed->dominates(n,dsn->value());
                if (qnDominated)
-                  allLocsDS[dDS++] = k;
+                  allLocsDS[dDS++] = dsn;
             }
             prune: 
-            newGuyDominated = newGuyDominatedDD || newGuyDominatedDS;
+            newGuyDominated = newGuyDominatedBB || newGuyDominatedDS;
             if (dBB) {
                //std::cout << "new BBNode Dominated " << d << " BB nodes" << std::endl;
                for(auto i =0u; i < dBB;i++) 
@@ -148,10 +148,11 @@ void BAndBRestrictedFirst::search(Bounds& bnds)
             delete[]allLocsBB;
             if (dDS) {
                //std::cout << "new BBNode Dominated " << dDS << " BB nodes" << std::endl;
-               for(auto i: allLocsDS) 
-                  discardSet.erase((i+1).base());
+               for(auto i =0u; i < dDS;i++) 
+                  discardSet.remove(allLocsDS[i]);
                pruned += dDS;
             }
+            delete[]allLocsDS;
          }
 
          bool dualBetter = relaxed->apply(n, bnds);
